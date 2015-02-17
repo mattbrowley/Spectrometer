@@ -26,7 +26,7 @@ class Main_Ui_Window(QtGui.QMainWindow):
         # active_data is [calibration, corrected, integration time]
         # loaded_data is [calibration, corrected]
         # fit_data is [calibration, corrected]
-        self.blank_data = [np.zeros(2048, float), 5]
+        self.blank_data = [np.zeros(2048, float), 0]
         self.active_data = [np.array(range(3000,9000,2))[:2048]/8000000000.0,
                             np.zeros(2048, float), 5.0]
         self.loaded_data = [np.array(range(3000,9000,2))[:2048]/8000000000.0,
@@ -50,57 +50,60 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.vertical_layout = QtGui.QVBoxLayout(self.main_frame)
         self.vertical_layout.setSizeConstraint(QtGui.QLayout.SetNoConstraint)
         self.vertical_layout.setObjectName("vertical_layout")
-        self.paramaters_layout = QtGui.QHBoxLayout()
-        self.paramaters_layout.setMargin(0)
-        self.paramaters_layout.setObjectName("paramaters_layout")
+        self.parameters_layout = QtGui.QHBoxLayout()
+        self.parameters_layout.setMargin(0)
+        self.parameters_layout.setObjectName("parameters_layout")
         # Integration Time Label and SpinBox
         self.i_time_label = QtGui.QLabel(self.main_frame)
         self.i_time_label.setObjectName("i_time_label")
         self.i_time_label.setText("Integration Time (ms):")
-        self.paramaters_layout.addWidget(self.i_time_label)
+        self.parameters_layout.addWidget(self.i_time_label)
         self.i_time_box = QtGui.QSpinBox(self.main_frame)
         self.i_time_box.setWrapping(False)
         self.i_time_box.setButtonSymbols(QtGui.QAbstractSpinBox.UpDownArrows)
         self.i_time_box.setMaximum(10000)
+        self.i_time_box.setMinimum(1)
         self.i_time_box.setProperty("value", 5)
         self.i_time_box.setObjectName("i_time_box")
-        self.paramaters_layout.addWidget(self.i_time_box)
+        self.parameters_layout.addWidget(self.i_time_box)
         # Load Calibration Curve Button
         self.load_cal_button = QtGui.QPushButton(self.main_frame)
+        self.load_cal_button.setStyleSheet("background-color: rgb(150, 200, 175);\n")
+        self.load_cal_button.setMinimumWidth(170)
         self.load_cal_button.setObjectName("load_cal_button")
         self.load_cal_button.setText("Load Calibration Curve")
-        self.paramaters_layout.addWidget(self.load_cal_button)
+        self.parameters_layout.addWidget(self.load_cal_button)
         # Messaging Area
         spacerItemL = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.paramaters_layout.addItem(spacerItemL)
+        self.parameters_layout.addItem(spacerItemL)
         self.message_label = QtGui.QLabel(self.main_frame)
         self.message_label.setObjectName("message_label")
         self.updateMessage("Bootup Proceeded Normally")
-        self.paramaters_layout.addWidget(self.message_label)
+        self.parameters_layout.addWidget(self.message_label)
         spacerItemR = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.paramaters_layout.addItem(spacerItemR)
+        self.parameters_layout.addItem(spacerItemR)
         # Com Port Labels and ComboBoxes
         self.sensor_port_label = QtGui.QLabel(self.main_frame)
         self.sensor_port_label.setObjectName("sensor_port_label")
         self.sensor_port_label.setText("Sensor Port:")
-        self.paramaters_layout.addWidget(self.sensor_port_label)
+        self.parameters_layout.addWidget(self.sensor_port_label)
         self.sensor_port_box = QtGui.QComboBox(self.main_frame)
         self.sensor_port_box.setObjectName("sensor_port_box")
-        self.paramaters_layout.addWidget(self.sensor_port_box)
+        self.parameters_layout.addWidget(self.sensor_port_box)
         self.line_9 = QtGui.QFrame(self.main_frame)
         self.line_9.setFrameShape(QtGui.QFrame.VLine)
         self.line_9.setFrameShadow(QtGui.QFrame.Sunken)
         self.line_9.setObjectName("line_9")
-        self.paramaters_layout.addWidget(self.line_9)
+        self.parameters_layout.addWidget(self.line_9)
         self.com_port_label = QtGui.QLabel(self.main_frame)
         self.com_port_label.setObjectName("com_port_label")
         self.com_port_label.setText("Com Port:")
-        self.paramaters_layout.addWidget(self.com_port_label)
+        self.parameters_layout.addWidget(self.com_port_label)
         self.com_port_box = QtGui.QComboBox(self.main_frame)
         self.com_port_box.setObjectName("com_port_box")
         self.findPorts()
-        self.paramaters_layout.addWidget(self.com_port_box)
-        self.vertical_layout.addLayout(self.paramaters_layout)
+        self.parameters_layout.addWidget(self.com_port_box)
+        self.vertical_layout.addLayout(self.parameters_layout)
         self.line_3 = QtGui.QFrame(self.main_frame)
         self.line_3.setFrameShape(QtGui.QFrame.HLine)
         self.line_3.setFrameShadow(QtGui.QFrame.Sunken)
@@ -108,35 +111,54 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.vertical_layout.addWidget(self.line_3)
         self.button_layout = QtGui.QHBoxLayout()
         self.button_layout.setObjectName("button_layout")
-        # Take Blank Button
+        # Blank Buttons
         self.take_blank_button = QtGui.QPushButton(self.main_frame)
-        self.take_blank_button.setStyleSheet("background-color: rgb(100, 100, 100);\n"
-                                             "color: rgb(255, 255, 255);")
+        self.take_blank_button.setToolTip("Acquire a Blank Spectrum to Subract from All Future Spectra")
+        self.take_blank_button.setStyleSheet("QPushButton{background-color: rgb(75, 75, 75);\n"
+                                             "color: rgb(255, 255, 255);}\n")
+        self.take_blank_button.setMaximumWidth(80)
         self.take_blank_button.setObjectName("take_blank_button")
         self.take_blank_button.setText("Take Blank")
-        self.take_blank_button.setToolTip("Acquire a Spectrum to Subract from All Future Spectra")
         self.button_layout.addWidget(self.take_blank_button)
+        self.clear_blank_button = QtGui.QPushButton(self.main_frame)
+        self.clear_blank_button.setStyleSheet("background-color: rgb(200, 180, 255);\n")
+        self.clear_blank_button.setMaximumWidth(80)
+        self.clear_blank_button.setObjectName("take_blank_button")
+        self.clear_blank_button.setText("Clear Blank")
+        self.clear_blank_button.setToolTip("Clear the Currently Stored Blank")
+        self.button_layout.addWidget(self.clear_blank_button)
+        self.line_1 = QtGui.QFrame(self.main_frame)
+        self.line_1.setFrameShape(QtGui.QFrame.VLine)
+        self.line_1.setFrameShadow(QtGui.QFrame.Sunken)
+        self.line_1.setObjectName("line_1")
+        self.button_layout.addWidget(self.line_1)
+        # Acquire Buttons
         self.take_snapshot_button = QtGui.QPushButton(self.main_frame)
+        self.take_snapshot_button.setStyleSheet("background-color: rgb(255, 180, 100);\n")
+        self.take_snapshot_button.setMaximumWidth(200)
         self.take_snapshot_button.setObjectName("take_snapshot_button")
         self.take_snapshot_button.setText("Take Snapshot")
         self.take_snapshot_button.setToolTip("Acquire One Spectrum")
         self.button_layout.addWidget(self.take_snapshot_button)
-        self.free_running_button = QtGui.QPushButton(self.main_frame)
+        self.free_running_button = QtGui.QCheckBox(self.main_frame)
         self.free_running_button.setCheckable(True)
+        self.free_running_button.setMaximumWidth(140)
         self.free_running_button.setObjectName("free_running_button")
         self.free_running_button.setText("Free Running Mode")
         self.free_running_button.setToolTip("Acquire New Spectra as Quickly as Possible")
         self.button_layout.addWidget(self.free_running_button)
-        spacerItem1 = QtGui.QSpacerItem(100, 17, QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Minimum)
+        spacerItem1 = QtGui.QSpacerItem(400, 520, QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
         self.button_layout.addItem(spacerItem1)
-        # Save Button
+        # Save/load Buttons
         self.save_button = QtGui.QPushButton(self.main_frame)
-        self.save_button.setStyleSheet("background-color: rgb(255, 108, 110);")
+        self.save_button.setStyleSheet("background-color: rgb(255, 130, 130);")
+        self.save_button.setMaximumWidth(200)
         self.save_button.setObjectName("save_button")
         self.save_button.setText("Save Spectrum")
         self.button_layout.addWidget(self.save_button)
         self.load_button = QtGui.QPushButton(self.main_frame)
-        self.load_button.setStyleSheet("background-color: rgb(28, 255, 62);")
+        self.load_button.setStyleSheet("background-color: rgb(90, 250, 90);")
+        self.load_button.setMaximumWidth(200)
         self.load_button.setObjectName("load_button")
         self.load_button.setText("Load Spectrum")
         self.button_layout.addWidget(self.load_button)
@@ -236,19 +258,35 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.i_time_box.valueChanged.connect(self.setIntegrationT)
         self.load_cal_button.clicked.connect(self.loadCalibration)
         self.take_blank_button.clicked.connect(self.takeBlank)
+        self.clear_blank_button.clicked.connect(self.clearBlank)
         self.take_snapshot_button.clicked.connect(self.takeSnapshot)
         self.free_running_button.toggled.connect(self.setFreeRunning)
         self.save_button.clicked.connect(self.saveCurve)
         self.load_button.clicked.connect(self.loadCurve)
-        # Start collecting sensor data
+        # Start collecting sensor data and load the config
         self.signal.get_sensors.emit()
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.signal.get_sensors.emit)
         self.timer.start(10000) # update sensor data every 10s
+        self.loadConfig()
 
     # These methods are called as part of startup
     def loadConfig(self):
-        print("ToDo: load some configuration file here")
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+                self.importCalibration(lines[1][:-1])
+                self.importCurve(lines[3][:-1])
+                self.blank_data[1] = int(lines[5])
+                self.setIntegrationT(verbose = False)
+                for index, value in enumerate(lines[7:]):
+                    self.blank_data[0][index] = float(value)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Imported**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Imported**\n" + str(e)[:60])
+            print(e)
 
     def findPorts(self):
         self.ports = serial.tools.list_ports.comports()
@@ -274,7 +312,7 @@ class Main_Ui_Window(QtGui.QMainWindow):
         if xposition < 1:
             self.label_4.setText("{0:.2f} nm".format(xposition * 10**9))
         else:
-            self.label_4.setText("Pixel {}".format(int(xposition)))
+            self.label_4.setText("Pixel No. {}".format(int(xposition)))
 
     def mousePressEvent(self, evt):
         position = evt.pos()
@@ -316,6 +354,25 @@ class Main_Ui_Window(QtGui.QMainWindow):
             if was_free_running:
                 self.free_running_button.setChecked(True)
             return
+        self.importCalibration(load_path)
+        # Try saving the calibration filename to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[0] = "Calibration File Last Used:\n"
+            lines[1] = str(load_path) + "\n"
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        if was_free_running:
+            self.free_running_button.setChecked(True)
+
+    def importCalibration(self, load_path):
         try:
             with open(load_path, "r") as load_file:
                 reader = csv.reader(load_file)
@@ -325,21 +382,26 @@ class Main_Ui_Window(QtGui.QMainWindow):
                     if index >= starting_row:
                         new_calibration[index - starting_row] = float(row[1])
                 self.active_data[0] = new_calibration
+                self.fit_data[0] = new_calibration
+                self.curser.setValue(new_calibration[1024])
+                self.findFit()
+            self.updateActiveData()
             # A calibration file with "Dummy" in the name gives pixel number (from 0 to 2047)
             # To use it we must allow the plot to expand
             if "Dummy" in load_path:
                 self.plot_object.setLimits(xMin = -2, xMax = 2050)
+                self.plot_object.setLabel('bottom', 'Pixel', units = "")
+                #self.plot_object.render()
             else: #But normally, it is better to not allow arbitrary zooming on the plot
                 self.plot_object.setLimits(xMin = 0.0, xMax = 1200 * 10**-9)
-            self.updateActiveData()
+                self.plot_object.setLabel('bottom', 'Wavelength', units = 'm')
             self.updateMessage("Calibration Loaded Successfully")
         except OSError as e:
-            self.updateMessage("**Filename Error - Spectrum May Have Not Loded Properly**\n" + str(e)[:60])
-        except Exception as e:
-            self.updateMessage("**Unknown Error - Spectrum May Have Not Loaded Properly**\n" + str(e)[:60])
+            self.updateMessage("**Filename Error - Calibration May Have Not Loded Properly**\n" + str(e)[:60])
             print(e)
-        if was_free_running:
-            self.free_running_button.setChecked(True)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - Calibration May Have Not Loaded Properly**\n" + str(e)[:60])
+            print(e)
 
     def loadCurve(self):
         was_free_running = False
@@ -354,28 +416,45 @@ class Main_Ui_Window(QtGui.QMainWindow):
             if was_free_running:
                 self.free_running_button.setChecked(True)
             return
+        self.importCurve(load_path)
+        # Try saving the loaded filename to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[2] = "Spectrum File Last Loaded:\n"
+            lines[3] = str(load_path) + "\n"
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        if was_free_running:
+            self.free_running_button.setChecked(True)
+
+    def importCurve(self, load_path):
         try:
             with open(load_path, "r") as load_file:
                 reader = csv.reader(load_file, dialect = 'excel-tab')
                 new_calibration = np.zeros(2048, float)
                 new_data = np.zeros(2048, float)
-                starting_row = 11
+                starting_row = 15
                 for index, row in enumerate(reader):
-
                     if index >= starting_row:
                         new_calibration[index - starting_row] = float(row[0])
                         new_data[index - starting_row] = float(row[1])
                 self.loaded_data[0] = new_calibration
                 self.loaded_data[1] = new_data
             self.updateLoadedData()
-            self.updateMessage("Spectrum Loaded Successfully")
+            self.updateMessage("Spectrum Loaded - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         except OSError as e:
             self.updateMessage("**Filename Error - Spectrum May Have Not Loded Properly**\n" + str(e)[:60])
+            print(e)
         except Exception as e:
             self.updateMessage("**Unknown Error - Spectrum May Have Not Loaded Properly**\n" + str(e)[:60])
             print(e)
-        if was_free_running:
-            self.free_running_button.setChecked(True)
 
     def saveCurve(self):
         was_free_running = False
@@ -407,17 +486,20 @@ class Main_Ui_Window(QtGui.QMainWindow):
             self.updateMessage("Spectrum Saved Successfully")
         except OSError as e:
             self.updateMessage("**Filename Error - Spectrum May Have Not Saved Properly**\n" + str(e)[:60])
+            print(e)
         except Exception as e:
             self.updateMessage("**Unknown Error - Spectrum May Have Not Saved Properly**\n" + str(e)[:60])
             print(e)
         if was_free_running:
             self.free_running_button.setChecked(True)
 
-    def setIntegrationT(self):
+    def setIntegrationT(self, verbose = True):
         i_Time.write(self.i_time_box.value())
-        message = "Integration time set to {} ms - {}".format(self.i_time_box.value(), time.strftime("%Y-%m-%d %H:%M:%S"))
-        if self.i_time_box.value() != self.blank_data[1]:
-            message = message + "\n*Current Integration Time in Not the Same as That Used for the Blank - Consider Taking a New Blank*"
+        message = self.message_label.text()
+        if verbose:
+            message = "Integration time set to {} ms - {}".format(self.i_time_box.value(), time.strftime("%Y-%m-%d %H:%M:%S"))
+        if self.i_time_box.value() != self.blank_data[1] and self.blank_data[1] != 0:
+            message = message + "\n*Current Integration Time is Not the Same as That Used for the Blank ({} ms)- Consider Taking a New Blank*".format(self.blank_data[1])
         self.updateMessage(message)
 
     def updateMessage(self, message):
@@ -427,17 +509,45 @@ class Main_Ui_Window(QtGui.QMainWindow):
         if self.free_running:
             self.signal.get_spectrum.emit() # Start getting the next spectrum right away
         if self.is_blank: # The new data must be from a blank
-            old_blank = self.blank_data
-            self.blank_data = spectrum.read()
-            self.updateMessage("Blank Taken Successfully - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+            self.applyBlank(spectrum.read())
+            self.updateMessage("Blank Taken - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
             self.is_blank = False
-            # Undoing the old blank correction allows the user to apply a blank before OR after collecting a spectrum
-            self.active_data[1] = self.active_data[1] + old_blank[0]
         else:
             self.active_data[1:3] = spectrum.read()
         self.active_data[1] = self.active_data[1] - self.blank_data[0]
         self.updateActiveData()
         self.findFit()
+
+    def applyBlank(self, new_blank):
+        # First undo the old blank on the currently active data
+        old_blank = self.blank_data
+        self.active_data[1] = self.active_data[1] + old_blank[0]
+        self.blank_data = new_blank
+        self.blankToConfig()
+
+    def clearBlank(self):
+        self.applyBlank([np.zeros(2048, float), 0])
+        self.updateActiveData()
+        self.findFit()
+        self.updateMessage("Blank Cleared - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+
+    def blankToConfig(self):
+        # Try saving the blank data to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[4] = "Integration Time at Last Blank Taken:\n"
+            lines[5] = str(self.blank_data[1]) + "\n"
+            lines[6] = "Last Blank Taken:"
+            for index, value in enumerate(self.blank_data[0]):
+                lines[7 + index] = "\n" + str(value)
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
 
     def getSensorData(self): # A signal says there is new sensor data in the sensor_Data object
         self.temp, self.humidity, self.pressure = sensor_Data.read()
@@ -472,11 +582,15 @@ class Main_Ui_Window(QtGui.QMainWindow):
     def generateHeader(self):
         header = "This spectrum was collected on:\t" + time.strftime("%Y-%m-%d\t%H:%M:%S\n")
         header += "Integration Time:\t{}\tms\n".format(self.active_data[2])
-        header += "Environmental Paramaters-\n"
+        header += "------------------------\n"
+        header += "Environmental Parameters\n"
+        header += "------------------------\n"
         header += "Temp:\t{0:.2f}\tdegrees C\n".format(self.temp)
         header += "Humidity:\t{0:.2f}\t%\n".format(self.humidity)
         header += "Pressure:\t{0:.2f}\tpa\n".format(self.pressure)
-        header += "Fit Paramaters-\n"
+        header += "--------------\n"
+        header += "Fit Parameters\n"
+        header += "--------------\n"
         header += "Center:\t{0:.3e}\tm\n".format(self.center)
         header += "FWHM:\t{0:.2e}\tm\n\n".format(self.fwhm)
         header += "Wavelength (m)\tCorrected Signal\tApplied Blank\n"
@@ -546,6 +660,20 @@ class Sensor_Duino(QtCore.QObject):
 gaussian = lambda x, amp, center, fwhm, offset: amp * np.exp(-(x-center)**2/(2*fwhm**2)) + offset
 
 def main():
+    # Set the cwd to the Data folder to make it easy in the file dialogs
+    file_path = os.path.abspath(__file__)
+    folder_path = os.path.dirname(file_path)
+    data_path = os.path.join(folder_path, "Data")
+    try:
+        os.chdir(data_path)
+    except:
+        folder_path = os.getcwd()
+        data_path = os.path.join(folder_path, "Data")
+        try:
+            os.chdir(data_path)
+        except:
+            print("**Current Working Directory is NOT the Data Directory**")
+
     app = QtGui.QApplication(sys.argv)
 
     # Generate the mutex objects
@@ -574,21 +702,6 @@ def main():
     MainWindow = Main_Ui_Window()
     MainWindow.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
     MainWindow.showMaximized()
-
-    # Set the cwd to the Data folder to make it easy in the file dialogs
-    file_path = os.path.abspath(__file__)
-    folder_path = os.path.dirname(file_path)
-    data_path = os.path.join(folder_path, "Data")
-    try:
-        os.chdir(data_path)
-    except:
-        folder_path = os.getcwd()
-        data_path = os.path.join(folder_path, "Data")
-        try:
-            os.chdir(data_path)
-        except:
-            MainWindow.updateMessage("**Current Working Directory is NOT the Data Directory**")
-
     app.exec_()
     return MainWindow
 
