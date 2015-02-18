@@ -37,9 +37,13 @@ class Main_Ui_Window(QtGui.QMainWindow):
         #generate outbound signal and link all signals
         spec_Duino.updated.connect(self.getData)
         sensor_Duino.updated.connect(self.getSensorData)
+        spec_Duino.connected.connect(self.checkConnections)
+        sensor_Duino.connected.connect(self.checkConnections)
         self.signal = Outbound_Signal()
         self.signal.get_spectrum.connect(spec_Duino.read)
         self.signal.get_sensors.connect(sensor_Duino.read)
+        self.signal.set_spec_port.connect(spec_Duino.connectPort)
+        self.signal.set_sensor_port.connect(sensor_Duino.connectPort)
 
         # Create the main UI window
         QtGui.QMainWindow.__init__(self, parent)
@@ -95,14 +99,14 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.line_9.setFrameShadow(QtGui.QFrame.Sunken)
         self.line_9.setObjectName("line_9")
         self.parameters_layout.addWidget(self.line_9)
-        self.com_port_label = QtGui.QLabel(self.main_frame)
-        self.com_port_label.setObjectName("com_port_label")
-        self.com_port_label.setText("Com Port:")
-        self.parameters_layout.addWidget(self.com_port_label)
-        self.com_port_box = QtGui.QComboBox(self.main_frame)
-        self.com_port_box.setObjectName("com_port_box")
+        self.spec_port_label = QtGui.QLabel(self.main_frame)
+        self.spec_port_label.setObjectName("spec_port_label")
+        self.spec_port_label.setText("Spectrum Port:")
+        self.parameters_layout.addWidget(self.spec_port_label)
+        self.spec_port_box = QtGui.QComboBox(self.main_frame)
+        self.spec_port_box.setObjectName("spec_port_box")
         self.findPorts()
-        self.parameters_layout.addWidget(self.com_port_box)
+        self.parameters_layout.addWidget(self.spec_port_box)
         self.vertical_layout.addLayout(self.parameters_layout)
         self.line_3 = QtGui.QFrame(self.main_frame)
         self.line_3.setFrameShape(QtGui.QFrame.HLine)
@@ -257,6 +261,8 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.curser.sigPositionChanged.connect(self.curserMoved)
         self.i_time_box.valueChanged.connect(self.setIntegrationT)
         self.load_cal_button.clicked.connect(self.loadCalibration)
+        self.sensor_port_box.currentIndexChanged.connect(self.selectSensorPort)
+        self.spec_port_box.currentIndexChanged.connect(self.selectSpecPort)
         self.take_blank_button.clicked.connect(self.takeBlank)
         self.clear_blank_button.clicked.connect(self.clearBlank)
         self.take_snapshot_button.clicked.connect(self.takeSnapshot)
@@ -271,15 +277,19 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.loadConfig()
 
     # These methods are called as part of startup
-    def loadConfig(self):
+    def loadConfig(self): # Loads the previously used settings
         try:
             with open(".spec.config", "r") as config_file:
                 lines = config_file.readlines()
-                self.importCalibration(lines[1][:-1])
-                self.importCurve(lines[3][:-1])
-                self.blank_data[1] = int(lines[5])
+                # Set the port combo boxes and attempt to connect
+                self.sensor_port_box.setCurrentIndex(self.sensor_port_box.findText(lines[1][:-1]))
+                self.spec_port_box.setCurrentIndex(self.spec_port_box.findText(lines[3][:-1]))
+                self.importCalibration(lines[5][:-1])
+                self.importCurve(lines[7][:-1])
+                self.blank_data[1] = int(lines[9])
+                self.i_time_box.setValue(int(lines[9]))
                 self.setIntegrationT(verbose = False)
-                for index, value in enumerate(lines[7:]):
+                for index, value in enumerate(lines[11:]):
                     self.blank_data[0][index] = float(value)
         except OSError as e:
             self.updateMessage("**Filename Error - spec.config File Not Properly Imported**\n" + str(e)[:60])
@@ -290,11 +300,10 @@ class Main_Ui_Window(QtGui.QMainWindow):
 
     def findPorts(self):
         self.ports = serial.tools.list_ports.comports()
-        for index, comport in enumerate(self.ports[::-1]):
+        for index,comport in enumerate(self.ports[::-1]):
+            print(comport)
             self.sensor_port_box.addItem(comport[0])
-            self.com_port_box.addItem(comport[0])
-            self.sensor_port_box.setItemText(index, comport[1])
-            self.com_port_box.setItemText(index, comport[1])
+            self.spec_port_box.addItem(comport[0])
         if len(self.ports) == 0:
             self.updateMessage("**No Available Com Ports Detected**")
 
@@ -322,24 +331,16 @@ class Main_Ui_Window(QtGui.QMainWindow):
             view_range = self.plot_object.getPlotItem().viewRange()[0]
             if curser_pos.x() > view_range[0] and curser_pos.x() < view_range[1]:
                 self.curser.setValue(curser_pos)
+
     # Button press methods
-    def takeBlank(self):
-        self.is_blank = True
-        self.signal.get_spectrum.emit()
-
-    def takeSnapshot(self):
-        if(self.free_running):
-            self.free_running_button.setChecked(False)
-        self.signal.get_spectrum.emit()
-        self.updateMessage("Snapshot Initiated - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
-
-    def setFreeRunning(self):
-        self.free_running = self.free_running_button.isChecked()
-        if self.free_running:
-            self.updateMessage("Free-Running Mode Enabled")
-            self.signal.get_spectrum.emit()
-        else:
-            self.updateMessage("Free-Running Mode Disabled")
+    def setIntegrationT(self, verbose = True):
+        i_Time.write(self.i_time_box.value())
+        message = self.message_label.text()
+        if verbose:
+            message = "Integration time set to {} ms - {}".format(self.i_time_box.value(), time.strftime("%Y-%m-%d %H:%M:%S"))
+        if self.i_time_box.value() != self.blank_data[1] and self.blank_data[1] != 0:
+            message = message + "\n*Current Integration Time is Not the Same as That Used for the Blank ({} ms)- Consider Taking a New Blank*".format(self.blank_data[1])
+        self.updateMessage(message)
 
     def loadCalibration(self):
         was_free_running = False
@@ -355,106 +356,51 @@ class Main_Ui_Window(QtGui.QMainWindow):
                 self.free_running_button.setChecked(True)
             return
         self.importCalibration(load_path)
-        # Try saving the calibration filename to the spec.config file
-        try:
-            with open(".spec.config", "r") as config_file:
-                lines = config_file.readlines()
-            lines[0] = "Calibration File Last Used:\n"
-            lines[1] = str(load_path) + "\n"
-            with open(".spec.config", "wt") as config_file:
-                config_file.writelines(lines)
-        except OSError as e:
-            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
-            print(e)
-        except Exception as e:
-            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
-            print(e)
+        self.calToConfig(load_path)
         if was_free_running:
             self.free_running_button.setChecked(True)
 
-    def importCalibration(self, load_path):
-        try:
-            with open(load_path, "r") as load_file:
-                reader = csv.reader(load_file)
-                new_calibration = np.zeros(2048, float)
-                starting_row = 1
-                for index, row in enumerate(reader):
-                    if index >= starting_row:
-                        new_calibration[index - starting_row] = float(row[1])
-                self.active_data[0] = new_calibration
-                self.fit_data[0] = new_calibration
-                self.curser.setValue(new_calibration[1024])
-                self.findFit()
-            self.updateActiveData()
-            # A calibration file with "Dummy" in the name gives pixel number (from 0 to 2047)
-            # To use it we must allow the plot to expand
-            if "Dummy" in load_path:
-                self.plot_object.setLimits(xMin = -2, xMax = 2050)
-                self.plot_object.setLabel('bottom', 'Pixel', units = "")
-                #self.plot_object.render()
-            else: #But normally, it is better to not allow arbitrary zooming on the plot
-                self.plot_object.setLimits(xMin = 0.0, xMax = 1200 * 10**-9)
-                self.plot_object.setLabel('bottom', 'Wavelength', units = 'm')
-            self.updateMessage("Calibration Loaded Successfully")
-        except OSError as e:
-            self.updateMessage("**Filename Error - Calibration May Have Not Loded Properly**\n" + str(e)[:60])
-            print(e)
-        except Exception as e:
-            self.updateMessage("**Unknown Error - Calibration May Have Not Loaded Properly**\n" + str(e)[:60])
-            print(e)
+    def selectSensorPort(self):
+        spec_index = self.spec_port_box.currentIndex()
+        sensor_index = self.sensor_port_box.currentIndex()
+        if  sensor_index != spec_index:
+            sensor_Port.write(self.sensor_port_box.currentText())
+            self.signal.set_sensor_port.emit()
+        else:
+            self.updateMessage("**Please Select Different Com Ports for Sensor and Spectrum**")
 
-    def loadCurve(self):
-        was_free_running = False
+    def selectSpecPort(self):
+        spec_index = self.spec_port_box.currentIndex()
+        sensor_index = self.sensor_port_box.currentIndex()
+        if  sensor_index != spec_index:
+            spec_Port.write(self.spec_port_box.currentText())
+            self.signal.set_spec_port.emit()
+        else:
+            self.updateMessage("**Please Select Different Com Ports for Sensor and Spectrum**")
+
+    def takeBlank(self):
+        self.is_blank = True
+        self.signal.get_spectrum.emit()
+
+    def clearBlank(self):
+        self.applyBlank([np.zeros(2048, float), 0])
+        self.updateActiveData()
+        self.findFit()
+        self.updateMessage("Blank Cleared - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+
+    def takeSnapshot(self):
         if(self.free_running):
             self.free_running_button.setChecked(False)
-            was_free_running = True
-        load_path = QtGui.QFileDialog.getOpenFileName(self, "Select a Spectrum to Load",
-                                                      "",
-                                                      "Spectrum Files (*.csv);;All Files (*.*)")
-        if len(load_path) == 0:
-            self.updateMessage("**Spectrum Loading Cancelled - {}**".format(time.strftime("%Y-%m-%d %H:%M:%S")))
-            if was_free_running:
-                self.free_running_button.setChecked(True)
-            return
-        self.importCurve(load_path)
-        # Try saving the loaded filename to the spec.config file
-        try:
-            with open(".spec.config", "r") as config_file:
-                lines = config_file.readlines()
-            lines[2] = "Spectrum File Last Loaded:\n"
-            lines[3] = str(load_path) + "\n"
-            with open(".spec.config", "wt") as config_file:
-                config_file.writelines(lines)
-        except OSError as e:
-            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
-            print(e)
-        except Exception as e:
-            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
-            print(e)
-        if was_free_running:
-            self.free_running_button.setChecked(True)
+        self.signal.get_spectrum.emit()
+        self.updateMessage("Snapshot Initiated - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
-    def importCurve(self, load_path):
-        try:
-            with open(load_path, "r") as load_file:
-                reader = csv.reader(load_file, dialect = 'excel-tab')
-                new_calibration = np.zeros(2048, float)
-                new_data = np.zeros(2048, float)
-                starting_row = 15
-                for index, row in enumerate(reader):
-                    if index >= starting_row:
-                        new_calibration[index - starting_row] = float(row[0])
-                        new_data[index - starting_row] = float(row[1])
-                self.loaded_data[0] = new_calibration
-                self.loaded_data[1] = new_data
-            self.updateLoadedData()
-            self.updateMessage("Spectrum Loaded - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
-        except OSError as e:
-            self.updateMessage("**Filename Error - Spectrum May Have Not Loded Properly**\n" + str(e)[:60])
-            print(e)
-        except Exception as e:
-            self.updateMessage("**Unknown Error - Spectrum May Have Not Loaded Properly**\n" + str(e)[:60])
-            print(e)
+    def setFreeRunning(self):
+        self.free_running = self.free_running_button.isChecked()
+        if self.free_running:
+            self.updateMessage("Free-Running Mode Enabled - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+            self.signal.get_spectrum.emit()
+        else:
+            self.updateMessage("Free-Running Mode Disabled - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
     def saveCurve(self):
         was_free_running = False
@@ -483,7 +429,7 @@ class Main_Ui_Window(QtGui.QMainWindow):
                 for rownum in range(len(cal)):
                     row = [cal[rownum], dat[rownum], blank[rownum]]
                     writer.writerow(row)
-            self.updateMessage("Spectrum Saved Successfully")
+            self.updateMessage("Spectrum Saved - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
         except OSError as e:
             self.updateMessage("**Filename Error - Spectrum May Have Not Saved Properly**\n" + str(e)[:60])
             print(e)
@@ -493,18 +439,148 @@ class Main_Ui_Window(QtGui.QMainWindow):
         if was_free_running:
             self.free_running_button.setChecked(True)
 
-    def setIntegrationT(self, verbose = True):
-        i_Time.write(self.i_time_box.value())
-        message = self.message_label.text()
-        if verbose:
-            message = "Integration time set to {} ms - {}".format(self.i_time_box.value(), time.strftime("%Y-%m-%d %H:%M:%S"))
-        if self.i_time_box.value() != self.blank_data[1] and self.blank_data[1] != 0:
-            message = message + "\n*Current Integration Time is Not the Same as That Used for the Blank ({} ms)- Consider Taking a New Blank*".format(self.blank_data[1])
-        self.updateMessage(message)
+    def loadCurve(self):
+        was_free_running = False
+        if(self.free_running):
+            self.free_running_button.setChecked(False)
+            was_free_running = True
+        load_path = QtGui.QFileDialog.getOpenFileName(self, "Select a Spectrum to Load",
+                                                      "",
+                                                      "Spectrum Files (*.csv);;All Files (*.*)")
+        if len(load_path) == 0:
+            self.updateMessage("**Spectrum Loading Cancelled - {}**".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+            if was_free_running:
+                self.free_running_button.setChecked(True)
+            return
+        self.importCurve(load_path)
+        self.loadToConfig(load_path)
+        if was_free_running:
+            self.free_running_button.setChecked(True)
 
-    def updateMessage(self, message):
-        self.message_label.setText(message)
+    #These functions load data from files
+    def importCalibration(self, load_path):
+        try:
+            with open(load_path, "r") as load_file:
+                reader = csv.reader(load_file)
+                new_calibration = np.zeros(2048, float)
+                starting_row = 1
+                for index, row in enumerate(reader):
+                    if index >= starting_row:
+                        new_calibration[index - starting_row] = float(row[1])
+                self.active_data[0] = new_calibration
+                self.fit_data[0] = new_calibration
+                self.curser.setValue(new_calibration[1024])
+                self.findFit()
+            self.updateActiveData()
+            # A calibration file with "Dummy" in the name gives pixel number (from 0 to 2047)
+            # To use it we must allow the plot to expand
+            if "Dummy" in load_path:
+                self.plot_object.setLimits(xMin = -2, xMax = 2050)
+                self.plot_object.setLabel('bottom', 'Pixel', units = "")
+                #self.plot_object.render()
+            else: #But normally, it is better to not allow arbitrary zooming on the plot
+                self.plot_object.setLimits(xMin = 0.0, xMax = 1200 * 10**-9)
+                self.plot_object.setLabel('bottom', 'Wavelength', units = 'm')
+            self.updateMessage("Calibration Loaded Successfully")
+        except OSError as e:
+            self.updateMessage("**Filename Error - Calibration May Have Not Loaded Properly**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - Calibration May Have Not Loaded Properly**\n" + str(e)[:60])
+            print(e)
 
+    def importCurve(self, load_path):
+        try:
+            with open(load_path, "r") as load_file:
+                reader = csv.reader(load_file, dialect = 'excel-tab')
+                new_calibration = np.zeros(2048, float)
+                new_data = np.zeros(2048, float)
+                starting_row = 15
+                for index, row in enumerate(reader):
+                    if index >= starting_row:
+                        new_calibration[index - starting_row] = float(row[0])
+                        new_data[index - starting_row] = float(row[1])
+                self.loaded_data[0] = new_calibration
+                self.loaded_data[1] = new_data
+            self.updateLoadedData()
+            self.updateMessage("Spectrum Loaded - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+        except OSError as e:
+            self.updateMessage("**Filename Error - Spectrum May Have Not Loaded Properly**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - Spectrum May Have Not Loaded Properly**\n" + str(e)[:60])
+            print(e)
+
+    # These functions write to the .spec.config file when settings are changed
+    def blankToConfig(self):
+        # Try saving the blank data to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[8] = "Integration Time at Last Blank Taken:\n"
+            lines[9] = str(self.blank_data[1]) + "\n"
+            lines[10] = "Last Blank Taken:"
+            for index, value in enumerate(self.blank_data[0]):
+                lines[11 + index] = "\n" + str(value)
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+
+    def loadToConfig(self, load_path):
+        # Try saving the loaded filename to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[6] = "Spectrum File Last Loaded:\n"
+            lines[7] = str(load_path) + "\n"
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+
+    def calToConfig(self, load_path):
+        # Try saving the calibration filename to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[4] = "Calibration File Last Used:\n"
+            lines[5] = str(load_path) + "\n"
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+
+    def portsToConfig(self):
+        #Try saving the com ports to the spec.config file
+        try:
+            with open(".spec.config", "r") as config_file:
+                lines = config_file.readlines()
+            lines[0] = "Sensor Port Last Used:\n"
+            lines[1] = self.sensor_port_box.currentText() + "\n"
+            lines[2] = "Spec Port Last Used:\n"
+            lines[3] = self.spec_port_box.currentText() + "\n"
+            with open(".spec.config", "wt") as config_file:
+                config_file.writelines(lines)
+        except OSError as e:
+            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+        except Exception as e:
+            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
+            print(e)
+
+    # These functions are called when the Arduinos send signals
     def getData(self): # A signal says there is new data in spectrum object
         if self.free_running:
             self.signal.get_spectrum.emit() # Start getting the next spectrum right away
@@ -518,37 +594,6 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.updateActiveData()
         self.findFit()
 
-    def applyBlank(self, new_blank):
-        # First undo the old blank on the currently active data
-        old_blank = self.blank_data
-        self.active_data[1] = self.active_data[1] + old_blank[0]
-        self.blank_data = new_blank
-        self.blankToConfig()
-
-    def clearBlank(self):
-        self.applyBlank([np.zeros(2048, float), 0])
-        self.updateActiveData()
-        self.findFit()
-        self.updateMessage("Blank Cleared - {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
-
-    def blankToConfig(self):
-        # Try saving the blank data to the spec.config file
-        try:
-            with open(".spec.config", "r") as config_file:
-                lines = config_file.readlines()
-            lines[4] = "Integration Time at Last Blank Taken:\n"
-            lines[5] = str(self.blank_data[1]) + "\n"
-            lines[6] = "Last Blank Taken:"
-            for index, value in enumerate(self.blank_data[0]):
-                lines[7 + index] = "\n" + str(value)
-            with open(".spec.config", "wt") as config_file:
-                config_file.writelines(lines)
-        except OSError as e:
-            self.updateMessage("**Filename Error - spec.config File Not Properly Written**\n" + str(e)[:60])
-        except Exception as e:
-            self.updateMessage("**Unknown Error - spec.config File Not Properly Written**\n" + str(e)[:60])
-            print(e)
-
     def getSensorData(self): # A signal says there is new sensor data in the sensor_Data object
         self.temp, self.humidity, self.pressure = sensor_Data.read()
         # This is necessary to properly handle the degree glyph in python 2
@@ -559,12 +604,21 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.humidity_label.setText("{0:.2f} %".format(self.humidity))
         self.pressure_label.setText("{0:.2f} pa".format(self.pressure))
 
-    def updateActiveData(self):
-        self.active_curve.setData(self.active_data[0], self.active_data[1])
+    def checkConnections(self):
+        status = port_Status.read()
+        if status[0]:
+            message = "Sensor Arduino Connected Properly\n"
+        else:
+            message = "**Warning! Sensor Arduino Could Not Connect - Dummy Data is Being Generated**\n"
+        if status[1]:
+            message += "Spectrum Arduino Connected Properly"
+        else:
+            message += "**Warning! Spetrum Arduino Could Not Connect - Dummy Data is Being Generated**"
+        self.updateMessage(message)
+        if status[0] and status[1]: #only save successfull settings
+            self.portsToConfig()
 
-    def updateLoadedData(self):
-        self.loaded_curve.setData(self.loaded_data[0], self.loaded_data[1])
-
+    # Some extra functions for dealing with data
     def findFit(self):
         amplitude_guess = np.amax(self.active_data[1])
         center_guess = self.active_data[0][1024]
@@ -578,6 +632,23 @@ class Main_Ui_Window(QtGui.QMainWindow):
         self.fit_curve.setData(self.fit_data[0], self.fit_data[1])
         self.center_label.setText("{0:.2f} nm".format(self.center * 10**9))
         self.fwhm_label.setText("{0:.2f} nm".format(self.fwhm * 10**9))
+
+    def applyBlank(self, new_blank):
+        # First undo the old blank on the currently active data
+        old_blank = self.blank_data
+        self.active_data[1] = self.active_data[1] + old_blank[0]
+        self.blank_data = new_blank
+        self.blankToConfig()
+
+    # Some functions that update the ui
+    def updateActiveData(self):
+        self.active_curve.setData(self.active_data[0], self.active_data[1])
+
+    def updateLoadedData(self):
+        self.loaded_curve.setData(self.loaded_data[0], self.loaded_data[1])
+
+    def updateMessage(self, message):
+        self.message_label.setText(message)
 
     def generateHeader(self):
         header = "This spectrum was collected on:\t" + time.strftime("%Y-%m-%d\t%H:%M:%S\n")
@@ -630,79 +701,147 @@ class I_Time(QtCore.QMutex):
         self.value = new_value
         self.unlock()
 
+class Com_Port(QtCore.QMutex):
+    def __init__(self):
+        QtCore.QMutex.__init__(self)
+        self.value = None
+    def read(self):
+        return self.value
+    def write(self, new_value):
+        self.lock()
+        self.value = new_value
+        self.unlock()
+
+class Port_Status(QtCore.QMutex):
+    def __init__(self):
+        QtCore.QMutex.__init__(self)
+        self.value = [False, False] # Connection status of sensor, spec ports
+    def read(self):
+        return self.value
+    def write(self, new_value):
+        self.lock()
+        self.value = new_value
+        self.unlock()
+
 # These classes handle the communication between arduinos
 class Outbound_Signal(QtCore.QObject):
     get_spectrum = QtCore.pyqtSignal()
     get_sensors = QtCore.pyqtSignal()
-
-class Spec_Duino(QtCore.QObject):
-    updated = QtCore.pyqtSignal()
-    i_time = 5
-    def read(self):
-        i_time = i_Time.read()
-        # this generates a random gaussian dummy spectrum
-        amp = 10 + np.random.random() * 50
-        center = 875 + np.random.random() * 300
-        fwhm = 300 + np.random.random() * 100
-        offset = np.random.random() * 4
-        data = np.random.uniform(0,1, 2048)
-        data = data + gaussian(np.arange(2048), amp, center, fwhm, offset)
-        spectrum.write([data, i_time])
-        self.updated.emit()
+    set_spec_port = QtCore.pyqtSignal()
+    set_sensor_port = QtCore.pyqtSignal()
 
 class Sensor_Duino(QtCore.QObject):
     updated = QtCore.pyqtSignal()
+    connected = QtCore.pyqtSignal()
+    port = None
+    valid_connection = False
     def read(self):
-        sensor_Data.write(np.random.uniform(0,12,3))
+        if not self.valid_connection: # Generate dummy data
+            data = np.random.uniform(0, 12, 3)
+        else: # Get data from the Arduino
+            data = np.random.uniform(0, 12, 3)
+        sensor_Data.write(data)
         self.updated.emit()
+    def connectPort(self):
+        status = port_Status.read()
+        try:
+            self.port = serial.Serial(port=sensor_Port.read(), baudrate=57600, timeout=1)
+            print("Connecting to the Sensor_Duino on port " + str(sensor_Port.read()))
+            status[1] = True
+            self.valid_connection = True
+        except Exception as e:
+            print(e)
+            status[0] = False
+            self.valid_connection = False
+        port_Status.write(status)
+        self.connected.emit()
+
+class Spec_Duino(QtCore.QObject):
+    updated = QtCore.pyqtSignal()
+    connected = QtCore.pyqtSignal()
+    port = None
+    valid_connection = False
+    def read(self):
+        i_time = i_Time.read()
+        if not self.valid_connection:# this generates a random gaussian dummy spectrum
+            amp = 10 + np.random.random() * 50
+            center = 875 + np.random.random() * 300
+            fwhm = 300 + np.random.random() * 100
+            offset = np.random.random() * 4
+            data = np.random.uniform(0,1, 2048)
+            data = data + gaussian(np.arange(2048), amp, center, fwhm, offset)
+        else: # Get real data from the arduino
+            amp = 10 + np.random.random() * 50
+            center = 875 + np.random.random() * 300
+            fwhm = 300 + np.random.random() * 100
+            offset = np.random.random() * 4
+            data = np.random.uniform(0,1, 2048)
+            data = data + gaussian(np.arange(2048), amp, center, fwhm, offset)
+        spectrum.write([data, i_time])
+        self.updated.emit()
+    def connectPort(self):
+        status = port_Status.read()
+        try:
+            self.port = serial.Serial(port=spec_Port.read(), baudrate=57600, timeout=1)
+            print("Connecting to the Spec_Duino on port " + str(spec_Port.read()))
+            status[0] = True
+            self.valid_connection = True
+        except Exception as e:
+            print(e)
+            status[1] = False
+            self.valid_connection = False
+        port_Status.write(status)
+        self.connected.emit()
 
 # Define a lambda function for use in fitting
 gaussian = lambda x, amp, center, fwhm, offset: amp * np.exp(-(x-center)**2/(2*fwhm**2)) + offset
 
 def main():
     # Set the cwd to the Data folder to make it easy in the file dialogs
-    file_path = os.path.abspath(__file__)
-    folder_path = os.path.dirname(file_path)
-    data_path = os.path.join(folder_path, "Data")
-    try:
+    try: # First try using the filepath of the Spectrometer_Ui.py file
+        file_path = os.path.abspath(__file__)
+        folder_path = os.path.dirname(file_path)
+        data_path = os.path.join(folder_path, "Data")
         os.chdir(data_path)
-    except:
+    except: # Next try using the cwd
         folder_path = os.getcwd()
         data_path = os.path.join(folder_path, "Data")
         try:
             os.chdir(data_path)
         except:
             print("**Current Working Directory is NOT the Data Directory**")
-
-    app = QtGui.QApplication(sys.argv)
-
-    # Generate the mutex objects
-    global spectrum
-    global sensor_Data
-    global i_Time
-    spectrum = Spectrum()
-    sensor_Data = Sensor_Data()
-    i_Time = I_Time()
-
-    # Generate the 'duinos and start them in their own threads
-    global spec_Duino
-    global spec_thread
-    global sensor_Duino
-    global sensor_thread
-    spec_Duino = Spec_Duino()
-    spec_thread = QtCore.QThread()
-    spec_Duino.moveToThread(spec_thread)
-    spec_thread.start()
-    sensor_Duino = Sensor_Duino()
-    sensor_thread = QtCore.QThread()
-    sensor_Duino.moveToThread(sensor_thread)
-    sensor_thread.start()
-
     global MainWindow
     MainWindow = Main_Ui_Window()
     MainWindow.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
     MainWindow.showMaximized()
-    app.exec_()
     return MainWindow
 
+# Instantiate the application
+app = QtGui.QApplication(sys.argv)
+
+# Generate the mutex objects
+spectrum = Spectrum()
+sensor_Data = Sensor_Data()
+i_Time = I_Time()
+spec_Port = Com_Port()
+sensor_Port = Com_Port()
+port_Status = Port_Status()
+
+# Generate the Arduinos and start them in their own threads
+spec_Duino = Spec_Duino()
+spec_thread = QtCore.QThread()
+spec_Duino.moveToThread(spec_thread)
+spec_thread.start()
+sensor_Duino = Sensor_Duino()
+sensor_thread = QtCore.QThread()
+sensor_Duino.moveToThread(sensor_thread)
+sensor_thread.start()
+
+# Create the GUI and start the application
 main_form = main()
+app.exec_()
+
+#ToDo: Properly connect the Arduinos
+#ToDo: Actually Collect Data
+#ToDo: Clean up Documentation
+#ToDo: License
