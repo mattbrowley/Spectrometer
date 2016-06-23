@@ -18,3 +18,8 @@ Then run 'python3 Spectrometer_UI.py'
 
 Python 2.x compatability is not tested, but should be easy to implement
 and is a future goal of this project.
+
+Online Repository
+-----------------
+An online repository of this project may be accessed at:
+<https://bitbucket.org/mattbrowley/spectrometer>
