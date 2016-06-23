@@ -1,31 +1,30 @@
 #define VOut A0 // Analog input from CCD
 #define ROG 4 // Digital input from Slave_Clock
 #define CLK 26 // Clock signal to trigger interrupts
-
-#include <Wire.h>
+#define START 2 // I don't remember just now what this is. Sorry.
 
 volatile int data[2048];
 volatile int pixel;
 volatile bool reading;
-bool indicator = 0;
+bool indicator = 1;
 
 void setup() {
   analogReadResolution(12);
   Serial.begin(115200); //230400
   establishContact();  
-  Wire.begin();
-  //Wire.beginTransmission(4);
   pinMode(START, INPUT);
   pinMode(CLK, INPUT);
   pinMode(13, OUTPUT);
-  digitalWrite(13, indicator);
+  digitalWrite(13, 0);
+  delay(2000);
   reading = 0;
   pixel = 0;
   ADC->ADC_MR |= 0x80; // these lines set free running mode on adc 7 (pin A0)
   ADC->ADC_CR=2;
-  ADC->ADC_CHER=0x80;
+  ADC->ADC_CHER=0x80;  
   attachInterrupt(CLK, readPixel, RISING);
-  attachInterrupt(START, beginRead, FALLING);
+  attachInterrupt(START, beginRead, FALLING);  
+  digitalWrite(13, indicator);
 }
 
 void loop() {
@@ -45,12 +44,10 @@ void loop() {
 }
 
 void initiateScan(int i_time) {
-  Wire.beginTransmission(4);
-  Wire.write(i_time);
-  Wire.endTransmission();
 }
 
 void readPixel(){
+  
   if (pixel < 2048 && reading){
     pixel++;
     while((ADC->ADC_ISR & 0x80)==0); // wait for conversion

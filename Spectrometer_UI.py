@@ -899,8 +899,9 @@ class Spec_Duino(QtCore.QObject):
                   str(spec_Port.read()))
             response = str(self.port.readline())
             if "Spec" not in response:
-                raise ConnectionError("Spec Arduino may not be running proper "
-                                      "firmware")
+                print('Response on the Serial Port:{}'.format(response))
+                #raise ConnectionError("Spec Arduino may not be running proper "
+                #                      "firmware")
             # Sometimes an errant extra "Spec" appears in the input buffer
             self.port.readline()  # This clears "Spec" or waits 2s to timeout
             status[1] = True
