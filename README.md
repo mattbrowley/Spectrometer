@@ -22,4 +22,4 @@ and is a future goal of this project.
 Online Repository
 -----------------
 An online repository of this project may be accessed at:
-<https://bitbucket.org/mattbrowley/spectrometer>
+<https://github.com/mattbrowley/Spectrometer>
